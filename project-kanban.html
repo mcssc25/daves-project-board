@@ -1,0 +1,871 @@
+﻿<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dave's Project Board</title>
+    <link rel="icon" type="image/x-icon" href="kanban-icon.ico">
+    <link rel="shortcut icon" type="image/x-icon" href="kanban-icon.ico">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-1: #0e1726;
+            --bg-2: #111b2e;
+            --panel: rgba(255, 255, 255, 0.06);
+            --panel-strong: rgba(255, 255, 255, 0.1);
+            --line: rgba(255, 255, 255, 0.16);
+            --text: #f6f8fc;
+            --muted: rgba(246, 248, 252, 0.68);
+            --idea: #ffbf47;
+            --progress: #2ea8ff;
+            --done: #34c38f;
+            --danger: #ff5f5f;
+        }
+
+        body {
+            font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(140deg, var(--bg-1), var(--bg-2));
+            color: var(--text);
+            min-height: 100vh;
+            padding: 18px;
+        }
+
+        .wrap { max-width: 1360px; margin: 0 auto; }
+
+        .header {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 18px;
+        }
+
+        h1 { font-size: 2rem; letter-spacing: 0.2px; }
+
+        .subtitle { color: var(--muted); margin-top: 6px; font-size: 0.95rem; }
+
+        .sync-status {
+            margin-top: 8px;
+            font-size: 0.82rem;
+            color: var(--muted);
+        }
+
+        .actions { display: flex; gap: 10px; flex-wrap: wrap; }
+
+        button {
+            background: var(--panel-strong);
+            color: var(--text);
+            border: 1px solid var(--line);
+            padding: 10px 16px;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.15s;
+        }
+
+        button:hover { background: rgba(255, 255, 255, 0.18); transform: translateY(-1px); }
+
+        .danger { border-color: rgba(255, 95, 95, 0.5); color: #ffe5e5; }
+        .small-btn { padding: 8px 12px; font-size: 0.85rem; margin-top: 8px; }
+
+        .board { display: grid; grid-template-columns: repeat(3, minmax(280px, 1fr)); gap: 14px; }
+
+        .column {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            min-height: 70vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .column-head {
+            padding: 14px;
+            border-bottom: 1px solid var(--line);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .dot { width: 10px; height: 10px; border-radius: 50%; }
+        .ideas .dot { background: var(--idea); }
+        .in-progress .dot { background: var(--progress); }
+        .completed .dot { background: var(--done); }
+
+        .count {
+            margin-left: auto;
+            background: rgba(255, 255, 255, 0.12);
+            border: 1px solid var(--line);
+            border-radius: 999px;
+            padding: 3px 10px;
+            font-size: 0.85rem;
+            color: var(--muted);
+        }
+
+        .list { flex: 1; padding: 12px; min-height: 150px; }
+
+        .list.drag-over {
+            background: rgba(255, 255, 255, 0.07);
+            outline: 2px dashed rgba(255, 255, 255, 0.35);
+            outline-offset: -8px;
+            border-radius: 8px;
+        }
+
+        .card {
+            background: rgba(18, 24, 39, 0.75);
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: grab;
+            user-select: none;
+        }
+
+        .card:active { cursor: grabbing; }
+        .card-title { font-weight: 600; margin-bottom: 8px; word-break: break-word; }
+
+        .meta {
+            display: flex;
+            gap: 8px;
+            font-size: 0.78rem;
+            color: var(--muted);
+            margin-bottom: 8px;
+            flex-wrap: wrap;
+        }
+
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 999px;
+            border: 1px solid var(--line);
+            font-size: 0.72rem;
+            color: var(--muted);
+        }
+
+        .empty {
+            color: var(--muted);
+            text-align: center;
+            font-size: 0.9rem;
+            border: 1px dashed var(--line);
+            border-radius: 10px;
+            padding: 16px;
+        }
+
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.62);
+            display: none;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+            z-index: 100;
+        }
+
+        .modal.active { display: flex; }
+
+        .modal-card {
+            width: 100%;
+            max-width: 650px;
+            background: #111a2b;
+            border: 1px solid var(--line);
+            border-radius: 12px;
+            padding: 18px;
+            max-height: 90vh;
+            overflow: auto;
+        }
+
+        .field { margin-top: 12px; }
+
+        .field label {
+            display: block;
+            margin-bottom: 6px;
+            color: var(--muted);
+            font-size: 0.85rem;
+        }
+
+        input, textarea, select {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.07);
+            border: 1px solid var(--line);
+            color: var(--text);
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        textarea { min-height: 90px; resize: vertical; }
+
+        .tasks-wrap { margin-top: 8px; display: grid; gap: 8px; }
+
+        .task-row {
+            display: grid;
+            grid-template-columns: 22px 1fr 36px;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .task-row input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--done);
+            justify-self: center;
+        }
+
+        .task-delete { padding: 7px 0; line-height: 1; }
+
+        .task-empty {
+            color: var(--muted);
+            font-size: 0.84rem;
+            border: 1px dashed var(--line);
+            border-radius: 8px;
+            padding: 10px;
+        }
+
+        .modal-actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+        .hint { color: var(--muted); font-size: 0.82rem; margin-top: 10px; }
+
+        @media (max-width: 980px) {
+            .board { grid-template-columns: 1fr; }
+            .column { min-height: 220px; }
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="header">
+        <div>
+            <h1>Dave's Project Board</h1>
+            <div class="subtitle">Drop folders directly onto a column. Drag cards between New Ideas, In Progress, and Completed.</div>
+            <div class="sync-status" id="sync-status">Sync: Local only</div>
+        </div>
+        <div class="actions">
+            <button id="sign-in-btn" onclick="startSignIn()">Sign In</button>
+            <button id="sign-out-btn" onclick="startSignOut()" style="display:none;">Sign Out</button>
+            <button onclick="openAddModal('idea')">Add New Idea</button>
+            <button class="danger" onclick="resetBoard()">Clear Board</button>
+        </div>
+    </div>
+
+    <div class="board">
+        <section class="column ideas">
+            <div class="column-head">
+                <span class="dot"></span>
+                <h2>New Ideas</h2>
+                <span class="count" id="ideas-count">0</span>
+            </div>
+            <div class="list" id="ideas-list" data-status="idea"></div>
+        </section>
+
+        <section class="column in-progress">
+            <div class="column-head">
+                <span class="dot"></span>
+                <h2>In Progress</h2>
+                <span class="count" id="progress-count">0</span>
+            </div>
+            <div class="list" id="progress-list" data-status="in-progress"></div>
+        </section>
+
+        <section class="column completed">
+            <div class="column-head">
+                <span class="dot"></span>
+                <h2>Completed</h2>
+                <span class="count" id="completed-count">0</span>
+            </div>
+            <div class="list" id="completed-list" data-status="completed"></div>
+        </section>
+    </div>
+</div>
+
+<div class="modal" id="item-modal">
+    <div class="modal-card">
+        <h3 id="modal-title">Project</h3>
+        <div class="field">
+            <label for="item-name">Name</label>
+            <input id="item-name" type="text" maxlength="120">
+        </div>
+        <div class="field">
+            <label for="item-status">Status</label>
+            <select id="item-status">
+                <option value="idea">New Ideas</option>
+                <option value="in-progress">In Progress</option>
+                <option value="completed">Completed</option>
+            </select>
+        </div>
+        <div class="field">
+            <label for="item-goals">Project Goals</label>
+            <textarea id="item-goals" placeholder="What should this project accomplish?"></textarea>
+        </div>
+        <div class="field">
+            <label>Tasks</label>
+            <div id="tasks-list" class="tasks-wrap"></div>
+            <button class="small-btn" type="button" onclick="addTaskRow()">+ Add Task</button>
+        </div>
+        <div class="hint" id="item-path"></div>
+        <div class="modal-actions">
+            <button onclick="saveModalItem()">Save</button>
+            <button class="danger" onclick="deleteModalItem()">Delete</button>
+            <button onclick="closeModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script src="./firebase-config.js"></script>
+<script>
+    const STORAGE_KEY = "dave-project-board:v1";
+    const LEGACY_KEY = "antigravity-projects";
+
+    let items = [];
+    let activeId = null;
+
+    let firebaseReady = false;
+    let auth = null;
+    let db = null;
+    let user = null;
+    let cloudDocRef = null;
+    let unsubscribeCloud = null;
+    let cloudSaveTimer = null;
+
+    function makeId() {
+        return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+    }
+
+    function setSyncStatus(message) {
+        const el = document.getElementById("sync-status");
+        if (el) el.textContent = `Sync: ${message}`;
+    }
+
+    function updateAuthButtons() {
+        const signIn = document.getElementById("sign-in-btn");
+        const signOut = document.getElementById("sign-out-btn");
+
+        if (firebaseReady) {
+            if (user) {
+                signIn.style.display = "none";
+                signOut.style.display = "inline-block";
+            } else {
+                signIn.style.display = "inline-block";
+                signOut.style.display = "none";
+            }
+        } else {
+            signIn.style.display = "none";
+            signOut.style.display = "none";
+        }
+    }
+
+    function saveLocal() {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(items));
+    }
+
+    function queueCloudSave() {
+        if (!firebaseReady || !user || !cloudDocRef) {
+            saveLocal();
+            return;
+        }
+
+        saveLocal();
+
+        if (cloudSaveTimer) {
+            clearTimeout(cloudSaveTimer);
+        }
+
+        cloudSaveTimer = setTimeout(async () => {
+            try {
+                await cloudDocRef.set({
+                    items,
+                    updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                }, { merge: true });
+                setSyncStatus(`Cloud synced (${user.email || "signed in"})`);
+            } catch (err) {
+                console.error(err);
+                setSyncStatus("Cloud save failed, using local backup");
+            }
+        }, 180);
+    }
+
+    function normalizeTasks(rawTasks) {
+        if (!Array.isArray(rawTasks)) return [];
+        return rawTasks
+            .map((t) => {
+                if (typeof t === "string") {
+                    return { text: t.trim(), completed: false };
+                }
+                return {
+                    text: String((t && t.text) || "").trim(),
+                    completed: Boolean(t && t.completed)
+                };
+            })
+            .filter((t) => t.text.length > 0);
+    }
+
+    function normalizeStatus(status) {
+        if (status === "idea" || status === "in-progress" || status === "completed") return status;
+        return "idea";
+    }
+
+    function normalizeItem(raw) {
+        const completedTasks = Array.isArray(raw.completedTasks) ? raw.completedTasks.map((x) => ({ text: String(x || "").trim(), completed: true })) : [];
+        const remainingTasks = Array.isArray(raw.remainingTasks) ? raw.remainingTasks.map((x) => ({ text: String(x || "").trim(), completed: false })) : [];
+        const mergedTasks = normalizeTasks(raw.tasks)
+            .concat(completedTasks, remainingTasks)
+            .filter((t, idx, arr) => t.text && arr.findIndex((x) => x.text.toLowerCase() === t.text.toLowerCase()) === idx);
+
+        return {
+            id: raw.id ? String(raw.id) : makeId(),
+            name: raw.name || "Untitled",
+            status: normalizeStatus(raw.status),
+            goals: (raw.goals || raw.notes || raw.description || "").trim(),
+            tasks: mergedTasks,
+            path: raw.path || raw.location || "",
+            source: raw.source || "manual",
+            updatedAt: raw.updatedAt || new Date().toISOString()
+        };
+    }
+
+    function loadLocal() {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved);
+                items = Array.isArray(parsed) ? parsed.map(normalizeItem) : [];
+                return;
+            } catch (_) {}
+        }
+
+        const legacy = localStorage.getItem(LEGACY_KEY);
+        if (legacy) {
+            try {
+                const parsed = JSON.parse(legacy);
+                if (Array.isArray(parsed)) {
+                    items = parsed.map((p) => normalizeItem({ ...p, source: "legacy" }));
+                    saveLocal();
+                    return;
+                }
+            } catch (_) {}
+        }
+
+        items = [];
+    }
+
+    function escapeHtml(input) {
+        return String(input)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#39;");
+    }
+
+    function render() {
+        const lists = {
+            idea: document.getElementById("ideas-list"),
+            "in-progress": document.getElementById("progress-list"),
+            completed: document.getElementById("completed-list")
+        };
+
+        Object.values(lists).forEach((el) => { el.innerHTML = ""; });
+
+        const counts = { idea: 0, "in-progress": 0, completed: 0 };
+
+        items.forEach((item) => {
+            const card = document.createElement("div");
+            card.className = "card";
+            card.draggable = true;
+            card.dataset.id = item.id;
+
+            const updated = item.updatedAt ? new Date(item.updatedAt).toLocaleString() : "";
+            const tasks = normalizeTasks(item.tasks);
+            const done = tasks.filter((t) => t.completed).length;
+            const total = tasks.length;
+            const taskLabel = total > 0 ? `Tasks: ${done}/${total}` : "Tasks: none";
+            const sourceTag = item.source === "folder" ? '<span class="tag">Folder</span>' : '<span class="tag">Card</span>';
+
+            card.innerHTML = [
+                `<div class="card-title">${escapeHtml(item.name)}</div>`,
+                `<div class="meta"><span>${taskLabel}</span><span>${updated}</span></div>`,
+                sourceTag
+            ].join("");
+
+            card.addEventListener("dragstart", (event) => {
+                event.dataTransfer.setData("text/plain", item.id);
+                event.dataTransfer.effectAllowed = "move";
+            });
+
+            card.addEventListener("click", () => openModal(item.id));
+
+            lists[item.status].appendChild(card);
+            counts[item.status] += 1;
+        });
+
+        applyEmptyState(lists.idea, "Drop a folder here or add a new idea.");
+        applyEmptyState(lists["in-progress"], "Drag a project here when you start work.");
+        applyEmptyState(lists.completed, "Move projects here when they are done.");
+
+        document.getElementById("ideas-count").textContent = counts.idea;
+        document.getElementById("progress-count").textContent = counts["in-progress"];
+        document.getElementById("completed-count").textContent = counts.completed;
+    }
+
+    function applyEmptyState(el, text) {
+        if (el.children.length === 0) {
+            const blank = document.createElement("div");
+            blank.className = "empty";
+            blank.textContent = text;
+            el.appendChild(blank);
+        }
+    }
+
+    function renderTaskRows(tasks) {
+        const list = document.getElementById("tasks-list");
+        list.innerHTML = "";
+
+        if (!tasks.length) {
+            const empty = document.createElement("div");
+            empty.className = "task-empty";
+            empty.textContent = "No tasks yet. Click + Add Task to create one.";
+            list.appendChild(empty);
+            return;
+        }
+
+        tasks.forEach((task, index) => {
+            const row = document.createElement("div");
+            row.className = "task-row";
+            row.innerHTML = `
+                <input type="checkbox" ${task.completed ? "checked" : ""} aria-label="Task completed">
+                <input type="text" value="${escapeHtml(task.text)}" placeholder="Task description">
+                <button class="danger task-delete" type="button" title="Remove task">x</button>
+            `;
+
+            const checkbox = row.children[0];
+            const textInput = row.children[1];
+            const deleteBtn = row.children[2];
+
+            checkbox.addEventListener("change", () => {
+                const current = collectTasksFromModal(true);
+                current[index].completed = checkbox.checked;
+                renderTaskRows(current);
+            });
+
+            textInput.addEventListener("input", () => {
+                const current = collectTasksFromModal(true);
+                current[index].text = textInput.value;
+            });
+
+            deleteBtn.addEventListener("click", () => {
+                const current = collectTasksFromModal(true);
+                current.splice(index, 1);
+                renderTaskRows(current);
+            });
+
+            list.appendChild(row);
+        });
+    }
+
+    function collectTasksFromModal(includeEmpty = false) {
+        const rows = Array.from(document.querySelectorAll("#tasks-list .task-row"));
+        const tasks = rows.map((row) => ({
+            completed: Boolean(row.querySelector('input[type="checkbox"]')?.checked),
+            text: String(row.querySelector('input[type="text"]')?.value || "").trim()
+        }));
+
+        if (includeEmpty) return tasks;
+        return tasks.filter((t) => t.text.length > 0);
+    }
+
+    function addTaskRow() {
+        const current = collectTasksFromModal(true);
+        current.push({ text: "", completed: false });
+        renderTaskRows(current);
+        const rows = document.querySelectorAll("#tasks-list .task-row input[type='text']");
+        if (rows.length > 0) rows[rows.length - 1].focus();
+    }
+
+    function openAddModal(defaultStatus) {
+        activeId = null;
+        document.getElementById("modal-title").textContent = "Add Project";
+        document.getElementById("item-name").value = "";
+        document.getElementById("item-status").value = defaultStatus || "idea";
+        document.getElementById("item-goals").value = "";
+        document.getElementById("item-path").textContent = "";
+        renderTaskRows([]);
+        document.getElementById("item-modal").classList.add("active");
+    }
+
+    function openModal(id) {
+        const item = items.find((x) => x.id === id);
+        if (!item) return;
+        activeId = id;
+        document.getElementById("modal-title").textContent = "Edit Project";
+        document.getElementById("item-name").value = item.name;
+        document.getElementById("item-status").value = item.status;
+        document.getElementById("item-goals").value = item.goals || "";
+        document.getElementById("item-path").textContent = item.path ? `Path: ${item.path}` : "";
+        renderTaskRows(normalizeTasks(item.tasks));
+        document.getElementById("item-modal").classList.add("active");
+    }
+
+    function closeModal() {
+        document.getElementById("item-modal").classList.remove("active");
+        activeId = null;
+    }
+
+    function saveModalItem() {
+        const name = document.getElementById("item-name").value.trim();
+        const status = document.getElementById("item-status").value;
+        const goals = document.getElementById("item-goals").value.trim();
+        const tasks = collectTasksFromModal();
+
+        if (!name) {
+            alert("Name is required.");
+            return;
+        }
+
+        if (activeId) {
+            const idx = items.findIndex((x) => x.id === activeId);
+            if (idx >= 0) {
+                items[idx] = { ...items[idx], name, status, goals, tasks, updatedAt: new Date().toISOString() };
+            }
+        } else {
+            items.push({
+                id: makeId(),
+                name,
+                status,
+                goals,
+                tasks,
+                path: "",
+                source: "manual",
+                updatedAt: new Date().toISOString()
+            });
+        }
+
+        queueCloudSave();
+        render();
+        closeModal();
+    }
+
+    function deleteModalItem() {
+        if (!activeId) {
+            closeModal();
+            return;
+        }
+
+        const target = items.find((x) => x.id === activeId);
+        if (!target) return;
+        if (!confirm(`Delete "${target.name}"?`)) return;
+
+        items = items.filter((x) => x.id !== activeId);
+        queueCloudSave();
+        render();
+        closeModal();
+    }
+
+    function resetBoard() {
+        if (!confirm("Clear all cards from this board?")) return;
+        items = [];
+        queueCloudSave();
+        render();
+    }
+
+    function moveItem(id, status) {
+        const idx = items.findIndex((x) => x.id === id);
+        if (idx < 0) return;
+        items[idx].status = status;
+        items[idx].updatedAt = new Date().toISOString();
+        queueCloudSave();
+        render();
+    }
+
+    function addFolderToStatus(name, status, path) {
+        const cleanName = (name || "").trim();
+        if (!cleanName) return;
+
+        const exists = items.find((x) => x.name.toLowerCase() === cleanName.toLowerCase());
+        if (exists) {
+            exists.status = status;
+            exists.path = path || exists.path || "";
+            exists.source = "folder";
+            exists.updatedAt = new Date().toISOString();
+        } else {
+            items.push({
+                id: makeId(),
+                name: cleanName,
+                status,
+                goals: "",
+                tasks: [],
+                path: path || "",
+                source: "folder",
+                updatedAt: new Date().toISOString()
+            });
+        }
+
+        queueCloudSave();
+        render();
+    }
+
+    function setupDropzones() {
+        document.querySelectorAll(".list").forEach((list) => {
+            list.addEventListener("dragover", (event) => {
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                list.classList.add("drag-over");
+            });
+
+            list.addEventListener("dragleave", () => {
+                list.classList.remove("drag-over");
+            });
+
+            list.addEventListener("drop", (event) => {
+                event.preventDefault();
+                list.classList.remove("drag-over");
+
+                const status = list.dataset.status;
+                const cardId = event.dataTransfer.getData("text/plain");
+
+                if (cardId && items.some((x) => x.id === cardId)) {
+                    moveItem(cardId, status);
+                    return;
+                }
+
+                const transferItems = Array.from(event.dataTransfer.items || []);
+                let addedFolder = false;
+
+                transferItems.forEach((entryItem) => {
+                    const entry = entryItem.webkitGetAsEntry ? entryItem.webkitGetAsEntry() : null;
+                    if (entry && entry.isDirectory) {
+                        addFolderToStatus(entry.name, status, entry.fullPath || entry.name);
+                        addedFolder = true;
+                    }
+                });
+
+                if (addedFolder) return;
+
+                const files = Array.from(event.dataTransfer.files || []);
+                files.forEach((f) => {
+                    const hasPath = f.webkitRelativePath && f.webkitRelativePath.includes("/");
+                    if (hasPath) {
+                        const folder = f.webkitRelativePath.split("/")[0];
+                        addFolderToStatus(folder, status, folder);
+                    }
+                });
+            });
+        });
+    }
+
+    function loadScript(src) {
+        return new Promise((resolve, reject) => {
+            const script = document.createElement("script");
+            script.src = src;
+            script.async = true;
+            script.onload = () => resolve();
+            script.onerror = () => reject(new Error(`Failed to load: ${src}`));
+            document.head.appendChild(script);
+        });
+    }
+
+    async function initFirebaseIfConfigured() {
+        const cfg = window.DPB_FIREBASE_CONFIG;
+        if (!cfg || !cfg.apiKey || !cfg.projectId || !cfg.appId) {
+            setSyncStatus("Local only (Firebase not configured)");
+            updateAuthButtons();
+            return;
+        }
+
+        try {
+            await loadScript("https://www.gstatic.com/firebasejs/10.12.5/firebase-app-compat.js");
+            await loadScript("https://www.gstatic.com/firebasejs/10.12.5/firebase-auth-compat.js");
+            await loadScript("https://www.gstatic.com/firebasejs/10.12.5/firebase-firestore-compat.js");
+
+            if (!firebase.apps.length) {
+                firebase.initializeApp(cfg);
+            }
+
+            auth = firebase.auth();
+            db = firebase.firestore();
+            firebaseReady = true;
+            setSyncStatus("Ready. Sign in to sync cloud data");
+            updateAuthButtons();
+
+            auth.onAuthStateChanged(async (currentUser) => {
+                user = currentUser;
+                updateAuthButtons();
+
+                if (unsubscribeCloud) {
+                    unsubscribeCloud();
+                    unsubscribeCloud = null;
+                }
+
+                if (!user) {
+                    cloudDocRef = null;
+                    setSyncStatus("Not signed in. Using local data");
+                    return;
+                }
+
+                cloudDocRef = db.collection("daves_project_boards").doc(user.uid);
+                setSyncStatus(`Signed in as ${user.email || user.uid}`);
+
+                unsubscribeCloud = cloudDocRef.onSnapshot(async (snap) => {
+                    if (snap.exists) {
+                        const data = snap.data() || {};
+                        if (Array.isArray(data.items)) {
+                            items = data.items.map(normalizeItem);
+                            saveLocal();
+                            render();
+                        }
+                    } else {
+                        await cloudDocRef.set({
+                            items,
+                            updatedAt: firebase.firestore.FieldValue.serverTimestamp()
+                        }, { merge: true });
+                    }
+                }, (err) => {
+                    console.error(err);
+                    setSyncStatus("Cloud listener error, using local data");
+                });
+            });
+        } catch (err) {
+            console.error(err);
+            firebaseReady = false;
+            setSyncStatus("Local only (Firebase init failed)");
+            updateAuthButtons();
+        }
+    }
+
+    async function startSignIn() {
+        if (!firebaseReady || !auth) return;
+        try {
+            const provider = new firebase.auth.GoogleAuthProvider();
+            await auth.signInWithPopup(provider);
+        } catch (err) {
+            try {
+                const provider = new firebase.auth.GoogleAuthProvider();
+                await auth.signInWithRedirect(provider);
+            } catch (fallbackErr) {
+                console.error(fallbackErr);
+                setSyncStatus("Sign in failed");
+            }
+        }
+    }
+
+    async function startSignOut() {
+        if (!firebaseReady || !auth) return;
+        try {
+            await auth.signOut();
+        } catch (err) {
+            console.error(err);
+            setSyncStatus("Sign out failed");
+        }
+    }
+
+    window.addEventListener("click", (event) => {
+        if (event.target && event.target.id === "item-modal") {
+            closeModal();
+        }
+    });
+
+    loadLocal();
+    setupDropzones();
+    render();
+    initFirebaseIfConfigured();
+</script>
+</body>
+</html>
